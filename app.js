@@ -5,7 +5,9 @@ import express from 'express';
 import ejs from 'ejs';
 import bodyParser from 'body-parser';
 import mongoose from 'mongoose'
-import encrypt from 'mongoose-encryption';
+//importing bcrypt for salting and hashing
+import bcrypt from 'bcrypt';
+const saltRounds = 10;
 
 
 //creating a app
@@ -24,9 +26,7 @@ const userSchema = new mongoose.Schema ({
 });
 
 
-//add this encrypt package as plugin before the creating the model and adding encryption only on password field not on email
-//we created a .env file and put our variable SECRET there and accessing it here with process.env.SECRET
-userSchema.plugin(encrypt, { secret: process.env.SECRET, encryptedFields: ["password"] });
+
 //Creating model for our data base using above created Schema and connecting it to database we have made
 const User = new mongoose.model("User", userSchema);
 
@@ -50,9 +50,12 @@ app.get("/register", (req,res)=>{
 app.post("/register", (req,res)=>{
     const email = req.body.username;
     const password = req.body.password;
+    bcrypt.hash(password, saltRounds, function(err, hash) {
+        // Store hash in your password DB.
+        
     const newUser = new User({
         email: email,
-        password: password
+        password: hash
     });
     //saving in db
     newUser.save()
@@ -63,16 +66,24 @@ app.post("/register", (req,res)=>{
       .catch((err)=>{
           throw err;
       })
+    });
+    
 });
 
 //checking the user creadential on login page
 app.post("/login", (req,res) => {
-    User.findOne({email: req.body.username})
+    const email = req.body.username;
+    const password = req.body.password;
+    User.findOne({email: email})
     .then((existedUser)=>{
-        if (existedUser.password === req.body.password) {
-        console.log("User is found.");
+        bcrypt.compare(password, existedUser.password, function(err, result) {
+            // result == true
+            if (result === true){
+                console.log("User is found.");
         res.render("secrets");
-    }
+            }
+            
+        });
     })
     .catch ((err)=> {
         throw err;
